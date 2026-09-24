@@ -1,33 +1,28 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useCallback, useEffect } from "react"
+import React, { useState, useRef, useCallback } from "react"
 import Link from "next/link"
 import {
-  Moon,
-  Sun,
   HardDrive,
   Cloud,
   FileText,
   File,
-  Upload,
-  X,
   CheckCircle,
   AlertCircle,
   Download,
   Loader2,
-  History,
-  Menu,
-  Home,
-  Info,
-  Shield,
-  Mail,
-  Calendar,
-  Clock,
-  Trash2,
+  X,
+  Sparkles,
+  ShieldCheck,
+  Zap,
+  ArrowRight,
+  RefreshCw,
+  Lock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
+import { useDownloadHistory } from "@/lib/history"
 
 interface FileUploadState {
   file: File | null
@@ -40,20 +35,8 @@ interface FileUploadState {
   convertedFileName: string | null
 }
 
-interface DownloadHistoryItem {
-  id: string
-  originalFileName: string
-  convertedFileName: string
-  conversionType: "pdf-to-word" | "word-to-pdf"
-  conversionDate: Date
-  fileSize: number
-  downloadCount: number
-}
-
 export default function MyPDFHomepage() {
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [downloadHistory, setDownloadHistory] = useState<DownloadHistoryItem[]>([])
+  const { addItem: addToDownloadHistory } = useDownloadHistory()
 
   const [pdfUpload, setPdfUpload] = useState<FileUploadState>({
     file: null,
@@ -65,6 +48,7 @@ export default function MyPDFHomepage() {
     convertedUrl: null,
     convertedFileName: null,
   })
+
   const [wordUpload, setWordUpload] = useState<FileUploadState>({
     file: null,
     isDragging: false,
@@ -79,86 +63,29 @@ export default function MyPDFHomepage() {
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const wordInputRef = useRef<HTMLInputElement>(null)
 
-  // Load download history from localStorage on component mount
-  useEffect(() => {
-    const savedHistory = localStorage.getItem("mypdf-download-history")
-    if (savedHistory) {
-      const parsedHistory = JSON.parse(savedHistory).map((item: any) => ({
-        ...item,
-        conversionDate: new Date(item.conversionDate),
-      }))
-      setDownloadHistory(parsedHistory)
-    }
-  }, [])
-
-  // Save download history to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("mypdf-download-history", JSON.stringify(downloadHistory))
-  }, [downloadHistory])
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("mypdf-theme")
-    if (savedTheme) {
-      setIsDarkMode(savedTheme === "dark")
-    }
-
-    const savedHistory = localStorage.getItem("mypdf-download-history")
-    if (savedHistory) {
-      const parsedHistory = JSON.parse(savedHistory).map((item: any) => ({
-        ...item,
-        conversionDate: new Date(item.conversionDate),
-      }))
-      setDownloadHistory(parsedHistory)
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    const newTheme = !isDarkMode
-    setIsDarkMode(newTheme)
-    localStorage.setItem("mypdf-theme", newTheme ? "dark" : "light")
-  }
-
   const validateFile = (file: File, type: "pdf" | "word"): string | null => {
     const maxSize = 10 * 1024 * 1024 // 10MB
 
     if (file.size > maxSize) {
-      return "File size must be less than 10MB"
+      return "File size exceeds 10MB limit. Please upload a smaller file."
     }
 
     if (type === "pdf") {
-      if (file.type !== "application/pdf") {
-        return "Please select a PDF file"
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        return "Please upload a valid PDF document (.pdf)."
       }
     } else {
       const validTypes = [
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ]
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(doc|docx)$/i)) {
-        return "Please select a DOC or DOCX file"
+      const validExt = file.name.match(/\.(doc|docx)$/i)
+      if (!validTypes.includes(file.type) && !validExt) {
+        return "Please upload a valid Word document (.doc or .docx)."
       }
     }
 
     return null
-  }
-
-  const addToDownloadHistory = (
-    originalFile: File,
-    conversionType: "pdf-to-word" | "word-to-pdf",
-    convertedFileName: string,
-  ): DownloadHistoryItem => {
-    const historyItem: DownloadHistoryItem = {
-      id: Date.now().toString(),
-      originalFileName: originalFile.name,
-      convertedFileName,
-      conversionType,
-      conversionDate: new Date(),
-      fileSize: originalFile.size,
-      downloadCount: 1,
-    }
-
-    setDownloadHistory((prev) => [historyItem, ...prev])
-    return historyItem
   }
 
   const handleConversion = async (
@@ -176,7 +103,7 @@ export default function MyPDFHomepage() {
       file,
       isDragging: false,
       isConverting: true,
-      conversionStatus: "Uploading...",
+      conversionStatus: "Uploading document...",
       isComplete: false,
       error: null,
       convertedUrl: null,
@@ -206,14 +133,14 @@ export default function MyPDFHomepage() {
         throw new Error(errMsg)
       }
 
-      setState((prev) => ({ ...prev, conversionStatus: "Preparing download..." }))
+      setState((prev) => ({ ...prev, conversionStatus: "Preparing your download..." }))
 
       const blob = await response.blob()
       const originalName = file.name.replace(/\.[^/.]+$/, "")
-      const convertedFileName = `${originalName}_converted.${targetFormat}`
+      const convertedFileName = `${originalName}.${targetFormat}`
       const downloadUrl = URL.createObjectURL(blob)
 
-      // Automatic programmatic download
+      // Automatic programmatic download trigger
       const link = document.createElement("a")
       link.href = downloadUrl
       link.download = convertedFileName
@@ -221,9 +148,14 @@ export default function MyPDFHomepage() {
       link.click()
       document.body.removeChild(link)
 
-      // Add to download history
+      // Reliably save to localStorage history
       const conversionType = targetFormat === "docx" ? "pdf-to-word" : "word-to-pdf"
-      addToDownloadHistory(file, conversionType, convertedFileName)
+      addToDownloadHistory({
+        originalFileName: file.name,
+        convertedFileName,
+        conversionType,
+        fileSize: file.size,
+      })
 
       setState((prev) => ({
         ...prev,
@@ -238,7 +170,7 @@ export default function MyPDFHomepage() {
         ...prev,
         isConverting: false,
         isComplete: false,
-        error: err?.message || "An unexpected error occurred during conversion.",
+        error: err?.message || "An unexpected error occurred during file conversion.",
       }))
     }
   }
@@ -253,47 +185,6 @@ export default function MyPDFHomepage() {
       document.body.removeChild(link)
     }
   }
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }, [])
-
-  const handleDragEnter = useCallback(
-    (e: React.DragEvent, setState: React.Dispatch<React.SetStateAction<FileUploadState>>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setState((prev) => ({ ...prev, isDragging: true }))
-    },
-    [],
-  )
-
-  const handleDragLeave = useCallback(
-    (e: React.DragEvent, setState: React.Dispatch<React.SetStateAction<FileUploadState>>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setState((prev) => ({ ...prev, isDragging: false }))
-    },
-    [],
-  )
-
-  const handleDrop = useCallback(
-    (
-      e: React.DragEvent,
-      targetFormat: "docx" | "pdf",
-      setState: React.Dispatch<React.SetStateAction<FileUploadState>>,
-    ) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setState((prev) => ({ ...prev, isDragging: false }))
-
-      const files = Array.from(e.dataTransfer.files)
-      if (files.length > 0) {
-        handleConversion(files[0], targetFormat, setState)
-      }
-    },
-    [],
-  )
 
   const resetUpload = (setState: React.Dispatch<React.SetStateAction<FileUploadState>>) => {
     setState((prev) => {
@@ -313,6 +204,44 @@ export default function MyPDFHomepage() {
     })
   }
 
+  const handleDragEnter = (
+    e: React.DragEvent,
+    setState: React.Dispatch<React.SetStateAction<FileUploadState>>,
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setState((prev) => ({ ...prev, isDragging: true }))
+  }
+
+  const handleDragLeave = (
+    e: React.DragEvent,
+    setState: React.Dispatch<React.SetStateAction<FileUploadState>>,
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setState((prev) => ({ ...prev, isDragging: false }))
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetFormat: "docx" | "pdf",
+    setState: React.Dispatch<React.SetStateAction<FileUploadState>>,
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setState((prev) => ({ ...prev, isDragging: false }))
+
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      handleConversion(files[0], targetFormat, setState)
+    }
+  }
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes"
     const k = 1024
@@ -321,182 +250,10 @@ export default function MyPDFHomepage() {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  return (
+    <div className="min-h-screen flex flex-col bg-white text-gray-900 selection:bg-red-500 selection:text-white">
+      <Navbar />
 
-  const clearDownloadHistory = () => {
-    setDownloadHistory([])
-    localStorage.removeItem("mypdf-download-history")
-  }
-
-  const removeHistoryItem = (id: string) => {
-    setDownloadHistory((prev) => prev.filter((item) => item.id !== id))
-  }
-
-
-
-  const renderNavigation = () => (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-        isDarkMode ? "bg-gray-900/95 backdrop-blur-sm border-gray-700" : "bg-white/95 backdrop-blur-sm border-gray-200"
-      } border-b`}
-    >
-      <div className="max-w-6xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-red-500 cursor-pointer">
-            MyPDF
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link
-              href="/"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                isDarkMode ? "text-red-500 bg-red-900/20" : "text-red-500 bg-red-50"
-              }`}
-            >
-              <Home className="w-4 h-4" />
-              Home
-            </Link>
-            <Link
-              href="/about"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-              }`}
-            >
-              <Info className="w-4 h-4" />
-              About
-            </Link>
-            <Link
-              href="/privacy"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              Privacy
-            </Link>
-            <Link
-              href="/contact"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-              }`}
-            >
-              <Mail className="w-4 h-4" />
-              Contact
-            </Link>
-            <Link
-              href="/history"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-              }`}
-            >
-              <History className="w-4 h-4" />
-              History ({downloadHistory.length})
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Theme Toggle */}
-            <Button
-              onClick={toggleTheme}
-              variant="outline"
-              size="icon"
-              className={`rounded-full transition-all duration-300 ${
-                isDarkMode
-                  ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
-                  : "bg-white border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {isDarkMode ? <Sun className="h-4 w-4 text-yellow-500" /> : <Moon className="h-4 w-4 text-gray-600" />}
-            </Button>
-
-            {/* Mobile Menu Toggle */}
-            <Button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              variant="outline"
-              size="icon"
-              className={`md:hidden rounded-full transition-all duration-300 ${
-                isDarkMode
-                  ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
-                  : "bg-white border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <Menu className="h-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col gap-2 mt-4">
-              <Link
-                href="/"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? "text-red-500 bg-red-900/20" : "text-red-500 bg-red-50"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Home className="w-4 h-4" />
-                Home
-              </Link>
-              <Link
-                href="/about"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Info className="w-4 h-4" />
-                About
-              </Link>
-              <Link
-                href="/privacy"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Shield className="w-4 h-4" />
-                Privacy Policy
-              </Link>
-              <Link
-                href="/contact"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Mail className="w-4 h-4" />
-                Contact
-              </Link>
-              <Link
-                href="/history"
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? "text-gray-300 hover:text-red-500" : "text-gray-700 hover:text-red-500"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <History className="w-4 h-4" />
-                Download History ({downloadHistory.length})
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
-  )
-
-  const renderHomePage = () => (
-    <div className="pt-20">
       {/* Hidden file inputs */}
       <input
         ref={pdfInputRef}
@@ -521,292 +278,392 @@ export default function MyPDFHomepage() {
         }}
       />
 
-      {/* Hero Section */}
-      <section className="min-h-screen flex items-center justify-center px-4 py-12 sm:py-16 md:py-20">
-        <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-            Welcome to <span className="text-red-500">MyPDF</span> — Your Free Online PDF Toolkit
-          </h1>
-          <p className="text-lg md:text-xl mb-12 opacity-80 max-w-2xl mx-auto">
-            Easily convert PDF to Word or Word to PDF in seconds. Fast, secure, and 100% free.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
-            <Button
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 sm:px-8 sm:py-4 text-base sm:text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
-              onClick={() => document.getElementById("pdf-to-word")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              Convert PDF to Word
-            </Button>
-            <Button
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 sm:px-8 sm:py-4 text-base sm:text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
-              onClick={() => document.getElementById("word-to-pdf")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              Convert Word to PDF
-            </Button>
+      <main className="flex-1 pt-16">
+        {/* HERO SECTION */}
+        <section className="relative overflow-hidden bg-gradient-to-b from-red-50/50 via-white to-white py-16 sm:py-24 border-b border-gray-100">
+          {/* Subtle Ambient Decorative Circles */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full overflow-hidden pointer-events-none -z-10">
+            <div className="absolute -top-32 left-1/4 w-96 h-96 bg-red-100/40 rounded-full blur-3xl" />
+            <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-rose-100/30 rounded-full blur-3xl" />
           </div>
 
-          <p className="text-xs sm:text-sm opacity-70 px-4">No sign-up needed. Just upload and convert instantly.</p>
-        </div>
-      </section>
-
-      {/* PDF to Word Converter Section */}
-      <section id="pdf-to-word" className={`py-12 sm:py-16 md:py-20 px-4 ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}>
-        <div className="max-w-4xl mx-auto">
-          <div
-            className={`rounded-2xl p-6 sm:p-8 md:p-12 shadow-xl transition-all duration-300 ${
-              isDarkMode ? "bg-gray-900" : "bg-white"
-            }`}
-          >
-            <div className="text-center mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">PDF to WORD Converter</h2>
-              <p className="text-base sm:text-lg opacity-80 max-w-2xl mx-auto px-4">
-                Convert your PDF to editable Word documents with incredible accuracy.
-              </p>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+            {/* Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-red-50 border border-red-200/80 text-red-600 mb-6 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-red-500" />
+              <span>Free, Fast & 100% Precise Document Converter</span>
             </div>
 
-            <div className="max-w-md mx-auto px-4">
-              <div
-                className={`border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all duration-300 relative ${
-                  pdfUpload.isDragging
-                    ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                    : pdfUpload.error
-                      ? "border-red-400"
-                      : pdfUpload.isComplete
-                        ? "border-green-500"
-                        : isDarkMode
-                          ? "border-gray-600 bg-gray-800 hover:border-red-500"
-                          : "border-gray-300 bg-gray-50 hover:border-red-500"
-                }`}
-                onDragOver={handleDragOver}
-                onDragEnter={(e) => handleDragEnter(e, setPdfUpload)}
-                onDragLeave={(e) => handleDragLeave(e, setPdfUpload)}
-                onDrop={(e) => handleDrop(e, "docx", setPdfUpload)}
-              >
-                {pdfUpload.isComplete ? (
-                  <div className="space-y-4">
-                    <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
-                    <div>
-                      <p className="font-semibold text-green-600 dark:text-green-400">Conversion Complete!</p>
-                      <p className="text-sm opacity-70">{pdfUpload.file?.name}</p>
-                      <p className="text-xs opacity-60">{pdfUpload.file && formatFileSize(pdfUpload.file.size)}</p>
-                    </div>
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 leading-[1.12] mb-6">
+              Convert Documents Instantly with{" "}
+              <span className="bg-gradient-to-r from-red-600 to-rose-500 bg-clip-text text-transparent">
+                Zero Quality Loss
+              </span>
+            </h1>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
-                        <Download className="w-4 h-4" />
-                        <span className="text-sm font-medium">Download completed!</span>
+            {/* Subtitle */}
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed mb-10">
+              Transform PDF files to editable Word documents and Word to PDF in seconds.
+              Powered by CloudConvert API v2 for reliable, pixel-perfect layout fidelity.
+            </p>
+
+            {/* Quick Action CTAs */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-10">
+              <Button
+                onClick={() => document.getElementById("pdf-to-word")?.scrollIntoView({ behavior: "smooth" })}
+                className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-semibold px-7 py-6 text-base rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <FileText className="w-5 h-5" />
+                <span>Convert PDF to Word</span>
+                <ArrowRight className="w-4 h-4 ml-1 opacity-75" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById("word-to-pdf")?.scrollIntoView({ behavior: "smooth" })}
+                className="w-full sm:w-auto bg-white hover:bg-gray-50 text-gray-800 border-gray-300 font-semibold px-7 py-6 text-base rounded-xl shadow-2xs hover:shadow-sm transition-all flex items-center justify-center gap-2"
+              >
+                <File className="w-5 h-5 text-blue-600" />
+                <span>Convert Word to PDF</span>
+                <ArrowRight className="w-4 h-4 ml-1 opacity-75" />
+              </Button>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 pt-4 border-t border-gray-100 text-xs sm:text-sm text-gray-500 font-medium">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>100% Secure & Auto-Purged</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span>Instant Cloud Processing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-blue-600" />
+                <span>No Registration Required</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CONVERTER WORKSPACE HUB */}
+        <section className="py-12 sm:py-20 px-4 sm:px-6 bg-slate-50/70">
+          <div className="max-w-5xl mx-auto space-y-12">
+            {/* TOOL 1: PDF TO WORD */}
+            <div
+              id="pdf-to-word"
+              className="bg-white rounded-2xl border border-gray-200/90 shadow-sm hover:shadow-md transition-all p-6 sm:p-8 md:p-10"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900">PDF to Word Converter</h2>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Convert PDF files into fully editable Microsoft Word (.docx) documents.
+                    </p>
+                  </div>
+                </div>
+                <div className="inline-flex self-start sm:self-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200/70">
+                  Target: DOCX
+                </div>
+              </div>
+
+              {/* Dropzone Card */}
+              <div className="max-w-xl mx-auto">
+                <div
+                  className={`border-2 border-dashed rounded-xl p-6 sm:p-10 text-center transition-all relative ${
+                    pdfUpload.isDragging
+                      ? "border-red-500 bg-red-50/50 ring-4 ring-red-100"
+                      : pdfUpload.error
+                        ? "border-red-300 bg-red-50/30"
+                        : pdfUpload.isComplete
+                          ? "border-emerald-500 bg-emerald-50/20"
+                          : "border-gray-300 bg-gray-50/60 hover:border-red-400 hover:bg-red-50/20"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, setPdfUpload)}
+                  onDragLeave={(e) => handleDragLeave(e, setPdfUpload)}
+                  onDrop={(e) => handleDrop(e, "docx", setPdfUpload)}
+                >
+                  {pdfUpload.isComplete ? (
+                    <div className="space-y-4 py-2">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                        <CheckCircle className="w-8 h-8" />
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-lg">Conversion Successful!</p>
+                        <p className="text-sm text-gray-600 mt-1 font-medium">{pdfUpload.convertedFileName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {pdfUpload.file && formatFileSize(pdfUpload.file.size)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
                         <Button
                           onClick={() => handleDownloadAgain(pdfUpload)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 text-sm rounded-lg flex items-center justify-center gap-2 shadow hover:shadow-md transition-all"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2"
                         >
                           <Download className="w-4 h-4" />
-                          Download Again
+                          <span>Download Word File</span>
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => resetUpload(setPdfUpload)}
-                          className="px-6 py-2 text-sm rounded-lg"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-100 font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2"
                         >
-                          Convert Another
+                          <RefreshCw className="w-4 h-4 text-gray-500" />
+                          <span>Convert Another</span>
                         </Button>
                       </div>
                     </div>
-                  </div>
-                ) : pdfUpload.isConverting ? (
-                  <div className="space-y-4">
-                    <Loader2 className="w-16 h-16 mx-auto text-red-500 animate-spin" />
+                  ) : pdfUpload.isConverting ? (
+                    <div className="space-y-4 py-4">
+                      <Loader2 className="w-12 h-12 mx-auto text-red-500 animate-spin" />
+                      <div>
+                        <p className="font-semibold text-gray-900 text-base">
+                          {pdfUpload.conversionStatus || "Processing document..."}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{pdfUpload.file?.name}</p>
+                        <div className="w-full max-w-xs mx-auto bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
+                          <div className="bg-red-500 h-2 rounded-full animate-pulse w-full" />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">Powered by CloudConvert</p>
+                      </div>
+                    </div>
+                  ) : (
                     <div>
-                      <p className="font-semibold text-base">{pdfUpload.conversionStatus || "Processing conversion..."}</p>
-                      <p className="text-sm opacity-70">{pdfUpload.file?.name}</p>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-3 overflow-hidden">
-                        <div className="bg-red-500 h-2 rounded-full animate-pulse w-full"></div>
+                      <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-red-100/70 text-red-600 flex items-center justify-center">
+                        <FileText className="w-7 h-7" />
                       </div>
-                      <p className="text-xs opacity-60 mt-2">Powered by CloudConvert</p>
+                      <Button
+                        onClick={() => pdfInputRef.current?.click()}
+                        className="bg-red-500 hover:bg-red-600 text-white px-7 py-3 text-base font-semibold rounded-lg shadow-sm hover:shadow transition-all mb-3 w-full sm:w-auto"
+                      >
+                        Choose PDF File
+                      </Button>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-4">
+                        or drag & drop your PDF file directly here
+                      </p>
+
+                      <div className="flex justify-center items-center gap-4 text-xs text-gray-400 mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <HardDrive className="w-3.5 h-3.5 text-gray-500" />
+                          <span>From Device</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Cloud className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Google Drive</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-400">Supported: .pdf • Max size: 10MB</p>
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <FileText className="w-16 h-16 mx-auto mb-4 text-red-500" />
-                    <Button
-                      onClick={() => pdfInputRef.current?.click()}
-                      className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 sm:px-8 sm:py-3 text-base sm:text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-3 sm:mb-4 w-full sm:w-auto"
-                    >
-                      Select PDF File
-                    </Button>
-                    <p className="text-xs sm:text-sm opacity-70 mb-3 sm:mb-4">or drag and drop your PDF file here</p>
+                  )}
 
-                    <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mb-3 sm:mb-4">
-                      <div className="flex items-center gap-2 text-xs sm:text-sm opacity-70">
-                        <HardDrive className="w-4 h-4" />
-                        <span>Device</span>
+                  {pdfUpload.error && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                        <span>{pdfUpload.error}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs sm:text-sm opacity-70">
-                        <Cloud className="w-4 h-4" />
-                        <span>Google Drive</span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs opacity-60">Output format: DOCX • Max size: 10MB</p>
-                  </div>
-                )}
-
-                {pdfUpload.error && (
-                  <div className="absolute top-2 right-2">
-                    <div className="bg-red-100 dark:bg-red-900/50 border border-red-400 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      {pdfUpload.error}
                       <button
                         onClick={() => setPdfUpload((prev) => ({ ...prev, error: null }))}
-                        className="ml-2 hover:text-red-900 dark:hover:text-red-200"
+                        className="text-red-500 hover:text-red-700"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Word to PDF Converter Section */}
-      <section id="word-to-pdf" className="py-12 sm:py-16 md:py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div
-            className={`rounded-2xl p-6 sm:p-8 md:p-12 shadow-xl transition-all duration-300 ${
-              isDarkMode ? "bg-gray-900" : "bg-white"
-            }`}
-          >
-            <div className="text-center mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">Convert WORD to PDF</h2>
-              <p className="text-base sm:text-lg opacity-80 max-w-2xl mx-auto px-4">
-                Make your DOC or DOCX files easy to read by converting them to PDF.
-              </p>
-            </div>
+            {/* TOOL 2: WORD TO PDF */}
+            <div
+              id="word-to-pdf"
+              className="bg-white rounded-2xl border border-gray-200/90 shadow-sm hover:shadow-md transition-all p-6 sm:p-8 md:p-10"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <File className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Word to PDF Converter</h2>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Convert DOC and DOCX files into universal, publication-ready PDF documents.
+                    </p>
+                  </div>
+                </div>
+                <div className="inline-flex self-start sm:self-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/70">
+                  Target: PDF
+                </div>
+              </div>
 
-            <div className="max-w-md mx-auto px-4">
-              <div
-                className={`border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all duration-300 relative ${
-                  wordUpload.isDragging
-                    ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                    : wordUpload.error
-                      ? "border-red-400"
-                      : wordUpload.isComplete
-                        ? "border-green-500"
-                        : isDarkMode
-                          ? "border-gray-600 bg-gray-800 hover:border-red-500"
-                          : "border-gray-300 bg-gray-50 hover:border-red-500"
-                }`}
-                onDragOver={handleDragOver}
-                onDragEnter={(e) => handleDragEnter(e, setWordUpload)}
-                onDragLeave={(e) => handleDragLeave(e, setWordUpload)}
-                onDrop={(e) => handleDrop(e, "pdf", setWordUpload)}
-              >
-                {wordUpload.isComplete ? (
-                  <div className="space-y-4">
-                    <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
-                    <div>
-                      <p className="font-semibold text-green-600 dark:text-green-400">Conversion Complete!</p>
-                      <p className="text-sm opacity-70">{wordUpload.file?.name}</p>
-                      <p className="text-xs opacity-60">{wordUpload.file && formatFileSize(wordUpload.file.size)}</p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
-                        <Download className="w-4 h-4" />
-                        <span className="text-sm font-medium">Download completed!</span>
+              {/* Dropzone Card */}
+              <div className="max-w-xl mx-auto">
+                <div
+                  className={`border-2 border-dashed rounded-xl p-6 sm:p-10 text-center transition-all relative ${
+                    wordUpload.isDragging
+                      ? "border-blue-500 bg-blue-50/50 ring-4 ring-blue-100"
+                      : wordUpload.error
+                        ? "border-red-300 bg-red-50/30"
+                        : wordUpload.isComplete
+                          ? "border-emerald-500 bg-emerald-50/20"
+                          : "border-gray-300 bg-gray-50/60 hover:border-blue-400 hover:bg-blue-50/20"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, setWordUpload)}
+                  onDragLeave={(e) => handleDragLeave(e, setWordUpload)}
+                  onDrop={(e) => handleDrop(e, "pdf", setWordUpload)}
+                >
+                  {wordUpload.isComplete ? (
+                    <div className="space-y-4 py-2">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                        <CheckCircle className="w-8 h-8" />
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-lg">Conversion Successful!</p>
+                        <p className="text-sm text-gray-600 mt-1 font-medium">{wordUpload.convertedFileName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {wordUpload.file && formatFileSize(wordUpload.file.size)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
                         <Button
                           onClick={() => handleDownloadAgain(wordUpload)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 text-sm rounded-lg flex items-center justify-center gap-2 shadow hover:shadow-md transition-all"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2"
                         >
                           <Download className="w-4 h-4" />
-                          Download Again
+                          <span>Download PDF File</span>
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => resetUpload(setWordUpload)}
-                          className="px-6 py-2 text-sm rounded-lg"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-100 font-medium px-5 py-2.5 rounded-lg flex items-center justify-center gap-2"
                         >
-                          Convert Another
+                          <RefreshCw className="w-4 h-4 text-gray-500" />
+                          <span>Convert Another</span>
                         </Button>
                       </div>
                     </div>
-                  </div>
-                ) : wordUpload.isConverting ? (
-                  <div className="space-y-4">
-                    <Loader2 className="w-16 h-16 mx-auto text-red-500 animate-spin" />
+                  ) : wordUpload.isConverting ? (
+                    <div className="space-y-4 py-4">
+                      <Loader2 className="w-12 h-12 mx-auto text-blue-500 animate-spin" />
+                      <div>
+                        <p className="font-semibold text-gray-900 text-base">
+                          {wordUpload.conversionStatus || "Processing document..."}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{wordUpload.file?.name}</p>
+                        <div className="w-full max-w-xs mx-auto bg-gray-200 rounded-full h-2 mt-4 overflow-hidden">
+                          <div className="bg-blue-500 h-2 rounded-full animate-pulse w-full" />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">Powered by CloudConvert</p>
+                      </div>
+                    </div>
+                  ) : (
                     <div>
-                      <p className="font-semibold text-base">{wordUpload.conversionStatus || "Processing conversion..."}</p>
-                      <p className="text-sm opacity-70">{wordUpload.file?.name}</p>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-3 overflow-hidden">
-                        <div className="bg-red-500 h-2 rounded-full animate-pulse w-full"></div>
+                      <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-blue-100/70 text-blue-600 flex items-center justify-center">
+                        <File className="w-7 h-7" />
                       </div>
-                      <p className="text-xs opacity-60 mt-2">Powered by CloudConvert</p>
+                      <Button
+                        onClick={() => wordInputRef.current?.click()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-7 py-3 text-base font-semibold rounded-lg shadow-sm hover:shadow transition-all mb-3 w-full sm:w-auto"
+                      >
+                        Choose WORD File
+                      </Button>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-4">
+                        or drag & drop your DOC or DOCX file here
+                      </p>
+
+                      <div className="flex justify-center items-center gap-4 text-xs text-gray-400 mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <HardDrive className="w-3.5 h-3.5 text-gray-500" />
+                          <span>From Device</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Cloud className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Google Drive</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-400">Supported: .doc, .docx • Max size: 10MB</p>
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <File className="w-16 h-16 mx-auto mb-4 text-red-500" />
-                    <Button
-                      onClick={() => wordInputRef.current?.click()}
-                      className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 sm:px-8 sm:py-3 text-base sm:text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mb-3 sm:mb-4 w-full sm:w-auto"
-                    >
-                      Select WORD File
-                    </Button>
-                    <p className="text-xs sm:text-sm opacity-70 mb-3 sm:mb-4">or drag and drop your DOC/DOCX file here</p>
+                  )}
 
-                    <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-4 mb-3 sm:mb-4">
-                      <div className="flex items-center gap-2 text-xs sm:text-sm opacity-70">
-                        <HardDrive className="w-4 h-4" />
-                        <span>Device</span>
+                  {wordUpload.error && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                        <span>{wordUpload.error}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs sm:text-sm opacity-70">
-                        <Cloud className="w-4 h-4" />
-                        <span>Google Drive</span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs opacity-60">Output format: PDF • Max size: 10MB</p>
-                  </div>
-                )}
-
-                {wordUpload.error && (
-                  <div className="absolute top-2 right-2">
-                    <div className="bg-red-100 dark:bg-red-900/50 border border-red-400 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      {wordUpload.error}
                       <button
                         onClick={() => setWordUpload((prev) => ({ ...prev, error: null }))}
-                        className="ml-2 hover:text-red-900 dark:hover:text-red-200"
+                        className="text-red-500 hover:text-red-700"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-    </div>
-  )
+        </section>
 
+        {/* WHY CHOOSE MYPDF SECTION */}
+        <section className="py-16 sm:py-24 px-4 sm:px-6 bg-white border-t border-gray-100">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                Why Millions Rely on MyPDF
+              </h2>
+              <p className="text-sm sm:text-base text-gray-500">
+                Engineered with industry-leading standards to deliver effortless document conversion with unmatched reliability.
+              </p>
+            </div>
 
-  return (
-    <div
-      className={`min-h-screen transition-colors duration-300 ${
-        isDarkMode ? "bg-gray-900 text-white" : "bg-white text-black"
-      }`}
-    >
-      {renderNavigation()}
-      {renderHomePage()}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="p-6 rounded-2xl bg-gray-50/80 border border-gray-200/70 hover:border-red-200 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mb-4">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Original Formatting Preserved</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Fonts, styles, tables, and images are accurately converted with zero displacement or corruption.
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-gray-50/80 border border-gray-200/70 hover:border-red-200 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Complete Privacy Guarantee</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Your files are transferred over TLS encryption and automatically deleted from the conversion engine immediately.
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-gray-50/80 border border-gray-200/70 hover:border-red-200 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Instant Cloud Speed</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  No queue delays or complicated software downloads. Experience lightning-fast conversions right in your browser.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <Footer />
     </div>
   )
 }

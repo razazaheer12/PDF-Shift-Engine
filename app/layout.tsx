@@ -26,7 +26,7 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} bg-white text-gray-900 min-h-screen antialiased`}>{children}</body>
     </html>
   )
 }
