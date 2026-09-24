@@ -14,10 +14,11 @@ A fast, modern, and free online PDF conversion toolkit that lets users seamlessl
 - 📄 **PDF to Word Conversion (.docx)**: Convert complex PDF files to fully editable Microsoft Word documents with layouts, styles, and typography preserved.
 - 📝 **Word to PDF Conversion**: Convert DOC and DOCX documents into clean, standard PDF files ready for distribution or printing.
 - ⚡ **Production-Ready CloudConvert Engine**: Powered by CloudConvert API v2 with server-side stream processing for zero file corruption and enterprise-grade conversion fidelity.
-- 🎨 **Clean, Modern & Responsive UI**: Built with Tailwind CSS and Radix UI components, fully responsive across desktop, tablet, and mobile displays.
-- 🌓 **Light / Dark Mode**: Seamless theme switching with persistent user preference storage.
-- 🔒 **Secure Processing**: Files are streamed directly to the conversion backend and purged automatically after download—ensuring complete user privacy.
-- 📜 **Client-Side Conversion History**: Easily keep track of your recent conversions and download details directly in your browser session.
+- ☀️ **Permanent Light Mode Theme**: Locked to an elegant, high-contrast light theme (white background with subtle slate cards) for maximum readability and distraction-free document workflows.
+- 🎨 **Polished & Unified Hero UI/UX**: Modernized hero banner featuring subtle ambient glow accents, paired with consistent card styling, padding, dashed dropzones, and typography across both conversion tools.
+- 🌐 **Global Footer Layout**: Unified global footer rendered consistently across all application routes (Home, About, Privacy, Contact, and History).
+- 📜 **Reliable Conversion History & Persistence**: Converted documents and download details reliably persist across browser sessions in `localStorage`. Includes a real-time reactive counter in the navigation bar that syncs automatically across page transitions and item deletions.
+- 🔒 **Zero-Storage Privacy Guarantee**: Files are streamed directly to the conversion backend and purged automatically after download—ensuring complete user confidentiality.
 
 ---
 
@@ -113,10 +114,16 @@ PDF-Shift-Engine/
 │   │   └── page.tsx             # Local conversion history view
 │   ├── privacy/
 │   │   └── page.tsx             # Privacy and security guidelines
-│   ├── globals.css              # Tailwind and design token styles
-│   ├── layout.tsx               # Root layout, fonts, and theme providers
-│   └── page.tsx                 # Main converter interface (drag & drop dropzones)
-├── components/                  # Reusable UI & Radix components
+│   ├── globals.css              # Tailwind and design token styles (light theme locked)
+│   ├── layout.tsx               # Root layout, fonts, and scripts
+│   └── page.tsx                 # Main converter interface (Hero + Dropzones + Features)
+├── components/
+│   ├── footer.tsx               # Global footer component
+│   ├── navbar.tsx               # Navigation bar with reactive history badge
+│   └── ui/                      # Reusable UI & Radix components
+├── lib/
+│   ├── history.ts               # LocalStorage persistence & reactive history hook
+│   └── utils.ts                 # Classname utility helpers
 ├── public/                      # Static assets & illustrations
 ├── .env.local                   # Environment configuration (ignored in git)
 ├── package.json                 # Project dependencies & scripts
